@@ -6,17 +6,21 @@
 
 ## Checkpoint A
 - [x] Multi-turn memory, commands, server-down error all work
-- [ ] Code reviewed together
+- [x] Code reviewed together
 
-- [ ] Task 3: Thinking hidden by default, SHOW_THINKING=true shows it, history stores answer only
+- [~] Task 3: SKIPPED (2026-10-29, Kush's call). Thinking is already hidden and history stores only the answer; SHOW_THINKING not needed
+
+## Deferred (2026-10-29, Kush's call): extras, revisit after tools + a basic front end
 - [ ] Task 4: Streaming (stream_chat generator, STREAM setting, errors mid-stream)
-
-## Checkpoint B
-- [ ] Both modes work, compared, llm.py reviewed
-
 - [ ] Task 5: Token usage line + trim_history (75% of CONTEXT_SIZE) + tests/test_jarvis.py
 - [ ] Task 6: README with exact PowerShell commands
 
-## Checkpoint C (Phase 1 done)
-- [ ] All Done-when boxes in PROJECT_CONTEXT.md §8 checked
-- [ ] Kush can explain every file
+# Phase 2: Todo (tool calling, open_app)
+
+- [x] Task 7: Probe raw tool-call responses (curl) → "Phase 2 server findings" in plan.md
+- [x] Task 8: open_app end to end (tools.py, APPS allowlist, llm.chat(tools), loop + rollback + log)
+- [x] Task 9: Bad calls (unknown app/tool, bad JSON), round cap, Ctrl+C rollback, tests/test_tools.py
+
+## Checkpoint D (Phase 2 done)
+- [x] All checks pass, seen by Kush
+- [ ] Kush can explain the loop and the allowlist

@@ -13,3 +13,15 @@ SYSTEM_PROMPT = (
     "You are Jarvis, a helpful assistant running locally on Kush's Windows laptop. "
     "Give short, direct answers."
 )
+
+# Apps open_app may start: the name the model sends -> the exe we run. Only these names work.
+APPS = {
+    "notepad": r"C:\Windows\System32\notepad.exe",
+    "calculator": r"C:\Windows\System32\calc.exe",
+    "chrome": r"C:\Program Files (x86)\Google\Chrome\Application\chrome.exe",
+    "edge": r"C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe",
+    "vscode": os.path.join(os.environ["LOCALAPPDATA"], r"Programs\Microsoft VS Code\Code.exe"),
+}
+
+# Model calls per user message. Stops a confused model from calling tools forever.
+MAX_TOOL_ROUNDS = 5

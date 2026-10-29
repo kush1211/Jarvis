@@ -3,6 +3,28 @@ import openai
 
 import config
 import llm
+import tools
+
+
+def reply(messages: list[dict]) -> str:
+    """Ask the model, run any tools it requests, send the results back, repeat until it answers
+    in text. Every step is added to messages, because the model needs it to write its answer."""
+    for _ in range(config.MAX_TOOL_ROUNDS):
+        message = llm.chat(messages, tools.TOOLS)
+        if not message.tool_calls:
+            return message.content
+
+        # The model's request goes into history first, then one result per call, linked by id.
+        messages.append({
+            "role": "assistant",
+            "content": message.content,
+            "tool_calls": [call.model_dump() for call in message.tool_calls],
+        })
+        for call in message.tool_calls:
+            result = tools.run_tool(call.function.name, call.function.arguments)
+            messages.append({"role": "tool", "tool_call_id": call.id, "content": result})
+
+    return f"(Stopped: more than {config.MAX_TOOL_ROUNDS} tool rounds for one message.)"
 
 
 def main():
@@ -33,19 +55,22 @@ def main():
             print("Commands: /clear, /exit")
             continue
 
+        # On failure, cut history back to here: one turn can add several messages (tool calls
+        # and results), and history must only keep complete turns.
+        turn_start = len(messages)
         messages.append({"role": "user", "content": user_text})
         try:
-            answer = llm.chat(messages)
+            answer = reply(messages)
         except openai.APIConnectionError:  # server down, wrong port, or timeout
-            messages.pop()  # history only keeps complete question+answer pairs
+            del messages[turn_start:]
             print(f"Can't reach llama-server at {config.BASE_URL}. Is it running?")
             continue
         except openai.APIError as e:  # server answered, but with an error
-            messages.pop()
+            del messages[turn_start:]
             print(f"LLM error: {e}")
             continue
         except KeyboardInterrupt:  # Ctrl+C while waiting for the reply
-            messages.pop()
+            del messages[turn_start:]
             print("\n(cancelled)")
             continue
 

@@ -106,3 +106,65 @@ Exact PowerShell commands: start the server, `uv venv`, install, copy `.env.exam
 - `prompt_tokens_details.cached_tokens` / `cache_n`: the server reuses the KV cache for a prompt prefix it has already seen. That's why resending the full history each turn stays cheap.
 - Generation was ~55 t/s this time (VRAM 2849/4096 MiB, all on GPU) vs 72–77 t/s in Phase 0. Cause unknown (power mode / charger / clocks?). A learning-track item, not a Phase 1 blocker.
 - Thinking roughly doubles to 30x the token count for trivial prompts. A strong argument for turning thinking off for simple commands in Phase 2.
+
+---
+
+# Plan: Jarvis Phase 2: tool calling, first tool `open_app`
+
+Phase 1 Tasks 3–6 are deferred (see todo.md). Phase 2 builds on the Task 2 code as it is now: non-streaming, no trimming.
+
+## Decisions
+- **No framework.** We write the tool loop ourselves: send messages + tools → if the reply has `tool_calls`, run them, append the results as `role: "tool"` messages, call again → stop when the reply is plain text.
+- **Max 5 tool rounds per user message** (`MAX_TOOL_ROUNDS` in config.py). When the cap is hit, Jarvis prints a message and stops.
+- **Allowlist in `config.py`** (`APPS = {"notepad": [path], ...}`), not `.env`, because it's a Python dict, not a secret. The model only sends a *name*. We look it up and run the fixed path with `subprocess.Popen([path])` and no shell, so model text never reaches a command line.
+- **`open_app` runs without confirmation:** it's read-only in effect (opens a window, changes nothing). Confirmations start in Phase 3 for tools that change something.
+- **Bad calls go back to the model as the tool result**, not as crashes (unknown app → "Unknown app 'x'. Allowed: ..."; bad JSON; unknown tool).
+- **Log every call:** one line in the terminal (`[tool] open_app(name='notepad') -> Opened notepad`) and the same line, with a timestamp, appended to `tool_calls.log` (gitignored).
+- **History:** the assistant message with `tool_calls` and every `tool` result go into `messages` (the model needs them to write its final answer). Thinking is never stored. On an error or Ctrl+C mid-loop we roll `messages` back to how it was *before* the user's message (today it's one `pop()`; with tools it can be several messages).
+- **Files:** new `tools.py` (schema + allowlist lookup + `run_tool`). `llm.chat` takes `tools` and returns the whole message, not just the text. The loop lives in `jarvis.py`.
+
+## Tasks
+
+### Task 7: Probe tool calls on the raw server (no code) · XS
+See exactly what llama-server returns before writing the loop (Gemma 4 had tool-call bugs at launch).
+- Accept: we've seen and written down in "Phase 2 server findings": the shape of `tool_calls` (id, function.name, function.arguments as a JSON *string*), `finish_reason`, whether `content`/`reasoning_content` are set alongside, and what the final answer looks like after we send a `role: "tool"` result back.
+- Verify: 2 curl requests by hand (call → result → answer). If the calls are malformed, update llama.cpp before going on.
+
+### Task 8: First working tool call, end to end · M
+"open notepad" opens Notepad, and Jarvis says it did.
+- `tools.py`: `TOOLS` (open_app schema; `name` is an `enum` of the allowlist keys, so the template tells the model the valid names), `run_tool(name, arguments_json) -> str`, and the log line.
+- `config.py`: `APPS` (notepad, calculator, chrome, edge, vscode, using paths found on this laptop) + `MAX_TOOL_ROUNDS = 5`.
+- `llm.py`: `chat(messages, tools=None)` returns the message object.
+- `jarvis.py`: the tool loop + rollback on error.
+- Accept: "open notepad" opens it; the `[tool]` line prints; `tool_calls.log` gets a line; "what is 2+2" still answers with no tool call; a follow-up ("which app did you just open?") works, so history is right.
+- Verify: manual, you watching.
+
+### Task 9: Bad calls and the cap · S
+- Accept: "open photoshop" → the model gets "Unknown app…" and tells you what it *can* open (no crash); broken argument JSON or an unknown tool name → an error result, no crash; the cap stops a looping model (tested by temporarily setting `MAX_TOOL_ROUNDS = 0`); Ctrl+C mid-loop rolls history back cleanly.
+- Verify: manual + one small `tests/test_tools.py` (pytest) for `run_tool`'s error paths, which never start an app.
+
+### Checkpoint D (Phase 2 done)
+- [ ] All Task 8–9 checks pass, seen by you
+- [ ] You can explain the loop in `jarvis.py` and why the allowlist makes it safe
+- [ ] Commit + push when you say so
+
+### Later (not in Phase 2 unless you want it)
+- Thinking on/off for tool commands (roadmap says "consider… measure"). Only if the delay bothers you.
+
+## Risks
+| Risk | Mitigation |
+|------|-----------|
+| Gemma 4 tool-call template bugs | Task 7 checks first; update llama.cpp if needed |
+| 2B model calls a tool when it shouldn't (or doesn't when it should) | System prompt line on when to use tools; `enum` limits names; check in Task 8 |
+| Tool schemas + results use up the 4096-token context | Watch it; this is when deferred Task 5 (trimming) comes back |
+| Chrome/VS Code paths change after updates | Paths live in one dict; a missing path gives a clear error result |
+
+## Phase 2 server findings (Task 7, 2026-10-29, build b11963)
+- **Tool calls work on this build. No llama.cpp update needed.** Request: system + "open notepad" + the `open_app` schema (`name` as an enum of 5 apps).
+- Reply: `finish_reason: "tool_calls"`, `content: ""` (empty string, not null), `reasoning_content` set (thinking still happens first, ~160 tokens / ~3 s), and
+  `tool_calls: [{"type":"function","id":"<32 random chars>","function":{"name":"open_app","arguments":"{\"name\":\"notepad\"}"}}]`.
+  `arguments` is a **JSON string**, so we need `json.loads`.
+- Sending back the assistant message (with `tool_calls`) + `{"role":"tool","tool_call_id":<id>,"content":"Opened notepad"}` → `finish_reason: "stop"`, content "Notepad is open."
+- The tool schema costs few tokens: the whole first request was 116 prompt tokens.
+- "what is 2+2" with tools attached → plain answer "4", no tool call.
+- "open photoshop" (not in the enum) → no tool call; it answered "I cannot open Photoshop. I can only open notepad, calculator, chrome, edge, or vscode." The enum steers it. Task 9 still has to handle a bad name in code, because a model can ignore the enum.
