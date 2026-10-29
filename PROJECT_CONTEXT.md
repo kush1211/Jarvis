@@ -156,7 +156,7 @@ llama-server on localhost:8080  (Gemma 4 E2B on the RTX 3050)
 
 ## 8. Roadmap
 
-### Phase 1: Python chat client (NEXT)
+### Phase 1: Python chat client (DONE 2026-10-29; streaming, trimming, show-thinking, README deferred)
 
 A terminal chat loop in Python that talks to llama-server. This is the skeleton tools get added to.
 
@@ -195,7 +195,7 @@ A basic connection from Jarvis to a PostgreSQL database. To decide before planni
 - **Alternative to weigh:** SQLite (Python stdlib, a single file, no server) covers single-user local storage. Postgres is worth it if the goal is learning Postgres, matching work tooling, or pgvector.
 - Connection settings go in `.env` (`DATABASE_URL`), never in code.
 
-### Phase 2: Tool calling, first tool `open_app`
+### Phase 2: Tool calling, first tool `open_app` (DONE 2026-10-29)
 
 - Define tools as JSON schemas, send them with the request, detect tool-call responses, execute in Python, send results back, get the final answer.
 - Write the loop ourselves (no framework) so I see every step. Put a **maximum number of tool iterations** per user message to prevent infinite loops.
@@ -205,7 +205,7 @@ A basic connection from Jarvis to a PostgreSQL database. To decide before planni
 - Consider turning thinking off/low for simple commands to cut delay; measure the difference.
 - If tool calls come back malformed: update llama.cpp first (known Gemma 4 launch bugs), and confirm `--jinja` is on.
 
-### Phase 3: More system tools
+### Phase 3: More system tools (NEXT)
 
 Candidates: current time/date, system info (battery, RAM, VRAM), reading files in specific allowed folders, opening URLs, media/volume controls.
 - **Safety tiers:** safe read-only tools run directly; anything that changes or sends something requires my **confirmation in the terminal**.

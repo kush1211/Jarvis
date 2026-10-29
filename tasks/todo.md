@@ -23,4 +23,4 @@
 
 ## Checkpoint D (Phase 2 done)
 - [x] All checks pass, seen by Kush
-- [ ] Kush can explain the loop and the allowlist
+- [x] Kush can explain the loop and the allowlist (closed by Kush, 2026-10-29)
