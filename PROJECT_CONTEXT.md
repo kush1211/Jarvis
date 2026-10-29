@@ -186,6 +186,15 @@ Done when:
 - [ ] With the server stopped, a clear error is shown instead of a crash.
 - [ ] I understand every file.
 
+### Future step: PostgreSQL connection (requested 2026-10-29, placement TBD)
+
+A basic connection from Jarvis to a PostgreSQL database. To decide before planning (see section 10):
+- **What it stores:** conversation history across restarts? tool-call logs? notes/memories? embeddings for RAG later (pgvector)?
+- **Where Postgres runs:** native Windows install, Docker, or an existing server. It's another always-on service using RAM next to the model.
+- **Library:** plain `psycopg` (v3), no ORM, in line with the no-frameworks rule.
+- **Alternative to weigh:** SQLite (Python stdlib, a single file, no server) covers single-user local storage. Postgres is worth it if the goal is learning Postgres, matching work tooling, or pgvector.
+- Connection settings go in `.env` (`DATABASE_URL`), never in code.
+
 ### Phase 2: Tool calling, first tool `open_app`
 
 - Define tools as JSON schemas, send them with the request, detect tool-call responses, execute in Python, send results back, get the final answer.
@@ -253,3 +262,4 @@ I'll study GPU theory, then run experiments and log the numbers (generation t/s,
 - Voice stack (separate STT vs Gemma's native audio).
 - Whether to move to E4B if E2B's tool calling is too unreliable.
 - Thinking mode: always off, always on, or chosen per request.
+- PostgreSQL: what it stores, where it runs, which phase it lands in, and whether SQLite is enough.

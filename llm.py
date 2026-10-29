@@ -3,7 +3,9 @@ from openai import OpenAI
 
 import config
 
-client = OpenAI(base_url=config.BASE_URL, api_key=config.API_KEY)
+# max_retries=0: the library retries twice by default (with delays). Locally, a refused
+# connection means the server isn't running, so report it right away.
+client = OpenAI(base_url=config.BASE_URL, api_key=config.API_KEY, max_retries=0)
 
 
 def chat(messages: list[dict]) -> str:

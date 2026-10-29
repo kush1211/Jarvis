@@ -2,10 +2,10 @@
 
 - [x] Task 0: Probe server raw responses (thinking field, usage, stream chunks) → findings in plan.md
 - [x] Task 1: Env + multi-turn non-streaming chat (requirements, .env.example, .gitignore, config.py, llm.chat, jarvis.py loop)
-- [ ] Task 2: /exit, /clear, Ctrl+C/EOF, friendly connection + API errors
+- [x] Task 2: /exit, /clear, Ctrl+C/EOF, friendly connection + API errors
 
 ## Checkpoint A
-- [ ] Multi-turn memory, commands, server-down error all work
+- [x] Multi-turn memory, commands, server-down error all work
 - [ ] Code reviewed together
 
 - [ ] Task 3: Thinking hidden by default, SHOW_THINKING=true shows it, history stores answer only
