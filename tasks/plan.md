@@ -168,3 +168,18 @@ See exactly what llama-server returns before writing the loop (Gemma 4 had tool-
 - The tool schema costs few tokens: the whole first request was 116 prompt tokens.
 - "what is 2+2" with tools attached → plain answer "4", no tool call.
 - "open photoshop" (not in the enum) → no tool call; it answered "I cannot open Photoshop. I can only open notepad, calculator, chrome, edge, or vscode." The enum steers it. Task 9 still has to handle a bad name in code, because a model can ignore the enum.
+
+# Plan: Front end, basic window (PySide6)
+
+## Context
+Kush wants a Windows app window, not the terminal or a website. This first window only proves the path works end to end (window → `reply()` → llama-server → tools → answer). Kush will provide the real design later, and it replaces this window.
+
+## Decisions
+- PySide6 (Kush's choice). New `app.py`; `jarvis.py` stays as the terminal client.
+- `jarvis.ask(messages, text)` holds one full turn (with rollback on errors). Terminal and window both call it.
+- The model call runs in a `QThread`, so the window doesn't freeze. Input is disabled while waiting.
+- Out of scope until the design arrives: styling, tool rows in the window, Clear button, shortcut, `start.ps1` changes.
+
+### Task F1: Basic window, end to end · S
+Files: `requirements.txt`, `jarvis.py`, `app.py`.
+Accept: chat works in the window; multi-turn memory; "open notepad" works; server off → friendly error; `jarvis.py` + pytest unchanged.

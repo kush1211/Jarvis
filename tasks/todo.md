@@ -24,3 +24,8 @@
 ## Checkpoint D (Phase 2 done)
 - [x] All checks pass, seen by Kush
 - [x] Kush can explain the loop and the allowlist (closed by Kush, 2026-10-29)
+
+# Front end: Todo (basic window)
+
+- [ ] Task F1: Basic PySide6 window, end to end (`app.py`, `jarvis.ask`), checked by Kush
+- [ ] Replace with Kush's design (when it arrives)
