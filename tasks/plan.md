@@ -1,0 +1,108 @@
+# Plan: Jarvis Phase 1 — Python chat client for llama-server
+
+## Context
+Phase 0 is done: llama-server runs Gemma 4 E2B on the RTX 3050 and serves an OpenAI-compatible API on `http://127.0.0.1:8080/v1`. Phase 1 builds the Python terminal chat client that later phases (tool calling, voice, cloud) plug into. Requirements: `PROJECT_CONTEXT.md` §8 Phase 1. It's a learning project, so we go one small task at a time: I explain each task, you OK it, I write the code, we test it together, and you make sure you understand it before we move on.
+
+Current state: the project folder has only `PROJECT_CONTEXT.md`. Python isn't on PATH; `uv` is installed (`C:\Users\Admin\.local\bin\uv.exe`) → we use it.
+
+## Decisions
+- **Env:** `uv venv --python 3.12` → `.venv`; `uv pip install -r requirements.txt`. Deps: `openai`, `python-dotenv`, `pytest`.
+- **No framework.** Plain Python, 3 modules + 1 test file.
+- **Thinking:** first look at the raw JSON the server actually returns (Task 0), then pick the parsing approach. Expected: llama-server with `--jinja` puts the thinking in `message.reasoning_content` (stream: `delta.reasoning_content`). Fallback: split on inline think tags.
+- **Streaming vs non-streaming:** keep both functions in `llm.py`; `STREAM=true|false` in `.env` picks one, so you can compare the two.
+- **Trimming:** after each reply, read `usage.prompt_tokens + completion_tokens` from the server. If it's over 75% of `CONTEXT_SIZE` (4096), drop the oldest user+assistant pair (never the system prompt). `# ponytail:` comment: it's a heuristic based on the last reply's size, not exact token counting; upgrade path = `/tokenize` endpoint.
+- **Testing:** check each task by hand against the live server, plus one `tests/test_jarvis.py` for the pure logic (trimming, splitting inline thinking).
+
+## Files
+| File | Purpose |
+|---|---|
+| `requirements.txt` | openai, python-dotenv, pytest |
+| `.env.example` (committed) / `.env` (gitignored) | `LLM_BASE_URL`, `LLM_MODEL`, `LLM_API_KEY`, `SHOW_THINKING`, `STREAM`, `CONTEXT_SIZE` |
+| `.gitignore` | `.env`, `.venv/`, `__pycache__/` |
+| `config.py` | loads `.env` once into module constants, plus `SYSTEM_PROMPT` |
+| `llm.py` | `chat(messages) -> Reply` (non-stream) and `stream_chat(messages)` generator yielding `("thinking"|"answer", text)` and finally usage |
+| `jarvis.py` | entry point: input loop, history, `/exit` `/clear`, printing, error messages, trimming |
+| `tests/test_jarvis.py` | trimming + inline-thinking split |
+| `README.md` | start server, set up env, run, settings |
+
+Dependency order: config → llm → jarvis (loop) → thinking → streaming → usage/trim → README.
+
+## Tasks
+
+### Task 0 — Probe the server (no code, ~10 min)
+Start llama-server, then send one request by hand with `Invoke-RestMethod` (non-stream) and with `curl.exe -N` (stream). Look at the response: where does the thinking text show up, is `usage` included, and what does a stream chunk look like.
+- **AC:** we know which field holds the thinking, the shape of `usage`, and whether the stream sends usage at the end.
+- **Verify:** findings written into `tasks/plan.md` under "Server findings".
+
+### Task 1 — Env + multi-turn chat (non-streaming) · M
+`requirements.txt`, `.env.example`, `.gitignore`, `config.py`, `llm.chat()`, and a minimal loop in `jarvis.py` that keeps `messages` and sends the full list each turn.
+- **AC:** `python jarvis.py` starts; "my name is Kush" → "what's my name?" answers Kush. Settings come only from `.env`.
+- **Verify:** manual run against the live server.
+
+### Task 2 — Commands + friendly errors · S
+`/exit` (plus Ctrl+C/EOF exits cleanly), `/clear` (reset to the system prompt only). Catch `openai.APIConnectionError` → `Can't reach llama-server at <url>. Is it running?` and keep the loop alive. Catch other `openai.APIError`s → short one-line message.
+- **AC:** `/clear` makes it forget the name; with the server stopped you get the friendly message and no traceback; restarting the server and typing again works.
+- **Verify:** manual (stop the server mid-session).
+
+**Checkpoint A:** multi-turn + commands + errors work → review the code together.
+
+### Task 3 — Thinking handling (non-streaming) · S
+Use what we learned in Task 0. Only store the final answer in history (never the thinking). If `SHOW_THINKING=true`, print the thinking dimmed above the answer.
+- **AC:** default → only the answer shows; with `SHOW_THINKING=true` → thinking + answer; history holds only the answer.
+- **Verify:** manual with both settings; the test covers the inline-tag fallback.
+
+### Task 4 — Streaming · M
+`llm.stream_chat()` reads the chunks, yields thinking/answer pieces, and records usage at the end. `jarvis.py` prints the pieces as they arrive (`flush=True`) and builds the full answer for history. `STREAM` picks the mode.
+- **AC:** the reply appears token by token; thinking is hidden or shown based on the setting; the remember-my-name test still passes; connection errors are still friendly (mid-stream too).
+- **Verify:** manual, both `STREAM` values.
+
+**Checkpoint B:** both modes work → compare how they feel and how fast they start, review `llm.py`.
+
+### Task 5 — Token usage + history trimming · S
+After each reply print `[tokens: prompt X + reply Y = Z / 4096]`. Pure function `trim_history(messages, used_tokens, limit)` drops the oldest user+assistant pair when over 75%. A server context-overflow error → trim + tell the user (or suggest `/clear`).
+- **AC:** usage line shows every reply; a long chat never errors out on context; the system prompt is always kept.
+- **Verify:** `.venv\Scripts\python -m pytest`; manual long chat (paste long text a few times).
+
+### Task 6 — README · XS
+Exact PowerShell commands: start the server, `uv venv`, install, copy `.env.example` → `.env`, run, settings table.
+- **AC:** a fresh shell following the README gets to a working chat.
+
+**Checkpoint C (Phase 1 done):** go through every checkbox in the Done-when list in `PROJECT_CONTEXT.md` §8, and you explain each file back in your own words.
+
+## After approval
+1. Write this plan to `tasks/plan.md` and the checklist to `tasks/todo.md` (the folder is empty, so nothing gets overwritten).
+2. Start Task 0. Explain → your OK → do → verify → next.
+
+## Risks
+| Risk | Mitigation |
+|---|---|
+| Thinking comes back inline, or the field name is different | Task 0 checks this first; inline-tag fallback |
+| Stream doesn't send usage | ask for it with `stream_options={"include_usage": True}`; else show usage only in non-stream mode |
+| Thinking makes simple replies slow | out of scope for Phase 1; note `--reasoning-budget 0` / `chat_template_kwargs` to try in Phase 2 |
+| VRAM taken by other apps → slow | close GPU apps; check Task Manager dedicated memory |
+
+## Verification (end to end)
+1. Start llama-server with the command from `PROJECT_CONTEXT.md` §5.
+2. `.venv\Scripts\python jarvis.py`: multi-turn memory, `/clear`, `/exit`, thinking on/off, stream on/off, usage line.
+3. Stop the server → friendly error; restart → keeps working.
+4. `.venv\Scripts\python -m pytest` passes.
+
+## Server findings (Task 0, 2026-10-29, build b11963)
+
+**Non-streaming** (`POST /v1/chat/completions`):
+- Thinking is in its own field: `choices[0].message.reasoning_content`. The final answer in `message.content` is clean, with no inline tags. → No tag splitting needed; drop the inline-tag fallback unless it shows up later.
+- `usage` = `{prompt_tokens, completion_tokens, total_tokens, prompt_tokens_details.cached_tokens}`. **`completion_tokens` includes the thinking**: "17*23?" → 247 completion tokens for a 7-token answer.
+- Bonus llama.cpp field `timings`: `predicted_per_second` (generation t/s), `prompt_per_second`, `cache_n`. Not part of the OpenAI format, but useful to show.
+
+**Streaming** (`"stream": true`, server-sent events):
+- Each line is `data: {json}`, with a blank line between events, ending with `data: [DONE]`.
+- First chunk: `delta.role = "assistant"`. Then the thinking pieces arrive as `delta.reasoning_content`, then the answer pieces as `delta.content`. One field per chunk, never mixed.
+- Last chunk before `[DONE]`: `finish_reason: "stop"` with an empty delta.
+- With `stream_options: {"include_usage": true}` there's one extra chunk with `choices: []` that carries `usage` (+ `timings`). → Code must handle an empty `choices` list.
+- "Say hi in 3 words" → 226 completion tokens, about 4 s of thinking before the first answer token shows up. So with thinking hidden, the user waits ~4 s seeing nothing → show a "thinking…" indicator.
+
+**Other observations:**
+- Server log: `n_slots = 4, n_ctx_slot = 4096, kv_unified = true`. The server runs 4 parallel request slots that share one 4096-token KV cache.
+- `prompt_tokens_details.cached_tokens` / `cache_n`: the server reuses the KV cache for a prompt prefix it has already seen. That's why resending the full history each turn stays cheap.
+- Generation was ~55 t/s this time (VRAM 2849/4096 MiB, all on GPU) vs 72–77 t/s in Phase 0. Cause unknown (power mode / charger / clocks?). A learning-track item, not a Phase 1 blocker.
+- Thinking roughly doubles to 30x the token count for trivial prompts. A strong argument for turning thinking off for simple commands in Phase 2.
