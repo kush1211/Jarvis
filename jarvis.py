@@ -27,9 +27,9 @@ def reply(messages: list[dict]) -> str:
     return f"(Stopped: more than {config.MAX_TOOL_ROUNDS} tool rounds for one message.)"
 
 
-def ask(messages: list[dict], user_text: str) -> str:
+def ask(messages: list[dict], user_text: str) -> tuple[str, bool]:
     """One full turn: add the user's text, get the answer, keep both in history.
-    Returns the answer, or a friendly error line. Used by the terminal and the window."""
+    Returns (answer, True), or (friendly error line, False). Used by the terminal and the window."""
     # On failure, cut history back to here: one turn can add several messages (tool calls
     # and results), and history must only keep complete turns.
     turn_start = len(messages)
@@ -38,16 +38,16 @@ def ask(messages: list[dict], user_text: str) -> str:
         answer = reply(messages)
     except openai.APIConnectionError:  # server down, wrong port, or timeout
         del messages[turn_start:]
-        return f"Can't reach llama-server at {config.BASE_URL}. Is it running?"
+        return f"Can't reach llama-server at {config.BASE_URL}. Is it running?", False
     except openai.APIError as e:  # server answered, but with an error
         del messages[turn_start:]
-        return f"LLM error: {e}"
+        return f"LLM error: {e}", False
     except KeyboardInterrupt:  # Ctrl+C while waiting for the reply (terminal only)
         del messages[turn_start:]
-        return "(cancelled)"
+        return "(cancelled)", False
 
     messages.append({"role": "assistant", "content": answer})
-    return answer
+    return answer, True
 
 
 def main():
@@ -78,7 +78,8 @@ def main():
             print("Commands: /clear, /exit")
             continue
 
-        print(f"jarvis> {ask(messages, user_text)}")
+        text, _ok = ask(messages, user_text)
+        print(f"jarvis> {text}")
 
 
 if __name__ == "__main__":

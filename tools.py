@@ -40,6 +40,14 @@ def open_app(name: str) -> str:
 FUNCTIONS = {"open_app": open_app}
 
 
+def print_call(name: str, arguments: str, result: str):
+    print(f"[tool] {name}({arguments}) -> {result}")
+
+
+# Called after every tool call. The terminal prints it; app.py swaps in its own function to show a row.
+on_call = print_call
+
+
 def run_tool(name: str, arguments: str) -> str:
     """Run one tool call and return the result text for the model. Prints and logs every call.
     Mistakes come back as "Error: ..." text, so the model can read them and tell the user."""
@@ -53,8 +61,7 @@ def run_tool(name: str, arguments: str) -> str:
         except OSError as e:  # the exe is missing or failed to start
             result = f"Error: could not start: {e}"
 
-    line = f"[tool] {name}({arguments}) -> {result}"
-    print(line)
+    on_call(name, arguments, result)
     with open(LOG_FILE, "a", encoding="utf-8") as f:
-        f.write(f"{datetime.datetime.now():%Y-%m-%d %H:%M:%S} {line}\n")
+        f.write(f"{datetime.datetime.now():%Y-%m-%d %H:%M:%S} [tool] {name}({arguments}) -> {result}\n")
     return result

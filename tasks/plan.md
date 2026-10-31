@@ -183,3 +183,100 @@ Kush wants a Windows app window, not the terminal or a website. This first windo
 ### Task F1: Basic window, end to end · S
 Files: `requirements.txt`, `jarvis.py`, `app.py`.
 Accept: chat works in the window; multi-turn memory; "open notepad" works; server off → friendly error; `jarvis.py` + pytest unchanged.
+
+## Design port: "Quiet Glass" (2026-10-31)
+
+### Overview
+Port Kush's chosen design (canvas https://claude.ai/artifact/DF9Db4xD7GgbfWeoJPzKQJ: Option B and its state boards B1 first open, B2 working, B4 longer answer, B5 error) into `app.py`, replacing the F1 test window. The core stays the same: `jarvis.ask` → `reply` → `llm` / `tools`. Kush won't read the front-end code, so how it looks is what counts; core changes stay small and readable.
+
+### Architecture decisions
+- **Native Qt widgets styled with QSS, no web view.** (A web view would be a website in a window, which Kush ruled out.) Colors come from the design: background `#0f0f14`, text `#ececf3`, muted `#9a9aac`, accent `#a9a4ff`, user bubble `#23232e`, input pill `#1a1a23` with border `#2c2c3a`, error `#ffb48a` on `#261a16`.
+- **Native Windows title bar, made dark** (DWM via `ctypes`). It looks close to the design, and snap, resize and Win11 rounded corners keep working. A custom frameless bar means more code and loses snap.
+- **Orb** = one painted `QWidget` (radial gradient + glow) with three looks: ready, working (extra rings), offline (grey).
+- **Font:** Segoe UI. Manrope isn't installed; adding it is a separate download step if wanted.
+- **Assistant text is rendered as Markdown** (`Qt.MarkdownText`), because Gemma answers in Markdown (B4).
+- **Two small core changes, done in the slice that needs them:** `tools.on_call = print` (hook for tool rows, F3) and `jarvis.ask` returning `(text, ok)` (error state, F4).
+
+### Dependency graph
+```
+jarvis.ask / reply / tools   (exist, F1)
+        │
+        F2  styled window + normal chat ──┬── F3 working state + tool rows (tools.on_call hook)
+                                          ├── F4 error state + Try again (ask → (text, ok))
+                                          └── F5 dark title bar
+```
+F3, F4 and F5 each depend only on F2, but they all edit `app.py`, so they run one at a time.
+
+### Task F2: Quiet Glass chat, normal flow · M
+**Description:** Rewrite `app.py` in the Quiet Glass look. The first open shows B1. After the first message the window switches to the Option B chat layout.
+
+**Acceptance criteria:**
+- [ ] First open: big glowing orb, "How can I help?", "Type below.", a rounded input pill with a round accent Send button (Enter or a click sends)
+- [ ] After a message: small orb + "Ready" at the top; a centred 640 px column; user bubble on the right (radius 20/20/6/20); Jarvis on the left with a small orb avatar; the list scrolls to the newest message
+- [ ] Long Markdown answers (lists, code) wrap inside the column and scroll
+
+**Verification:**
+- [ ] Tests pass: `.venv\Scripts\python -m pytest`
+- [ ] Builds: `.venv\Scripts\python -m py_compile app.py`
+- [ ] Manual: `.venv\Scripts\python app.py`, compare with boards B1 and Option B, chat 3 turns (memory works)
+
+**Dependencies:** F1 · **Files:** `app.py`
+
+### Task F3: Working state and tool rows (B2) · S
+**Description:** Show that Jarvis is busy, and show each tool call as it happens.
+
+**Acceptance criteria:**
+- [ ] While waiting: the orb gets rings, the label says "Working", the input is disabled with "Jarvis is working…"
+- [ ] Each tool call adds a row with a check icon in a card under the turn, e.g. "open_app(notepad): Opened notepad"; "Error: …" results are muted
+- [ ] The terminal client still prints `[tool] …` (hook default = `print`)
+
+**Verification:**
+- [ ] Tests pass: `.venv\Scripts\python -m pytest`
+- [ ] Manual: "open notepad" in the app → Working, then the tool row, then the answer; `python jarvis.py` prints the tool line as before
+
+**Dependencies:** F2 · **Files:** `app.py`, `tools.py`
+
+### Task F4: Error state with "Try again" (B5) · S
+**Description:** Show failures as the B5 error card instead of as a normal reply, and allow a one-click retry.
+
+**Acceptance criteria:**
+- [ ] `jarvis.ask` returns `(text, ok)`; the terminal prints exactly what it does today
+- [ ] On error: grey orb, orange status ("Can't reach llama-server"), card "I couldn't finish that" + the message, a "Try again" button that resends the same text (history was already rolled back)
+- [ ] The next successful turn brings back the normal look
+
+**Verification:**
+- [ ] Tests pass: `.venv\Scripts\python -m pytest`
+- [ ] Manual: server stopped → send → error card; start the server → Try again → the answer arrives; `python jarvis.py` with the server stopped prints the same friendly line
+
+**Dependencies:** F2 · **Files:** `jarvis.py`, `app.py`
+
+### Task F5: Dark title bar · XS
+**Description:** Make the native title bar match the window, and set the size and title.
+
+**Acceptance criteria:**
+- [ ] Dark-mode caption in color `#0f0f14`, window 1000×680, title "Jarvis"
+- [ ] Snap, maximise and resize still work; if the DWM calls fail (older Windows), the app still starts
+
+**Verification:**
+- [ ] Manual: on Windows 11 the title bar blends into the window; Win+Left snaps it
+
+**Dependencies:** F2 · **Files:** `app.py`
+
+### Checkpoint G: design port done
+- [ ] F2–F5 checked by Kush against the design boards
+- [ ] pytest passes; `python jarvis.py` behaves as before
+- [ ] Commit + push when Kush says so
+
+### Out of scope (nothing behind it yet)
+Mic button, "say Jarvis" and board B3 (voice, Phase 6) · "Use the local model instead" (cloud, Phase 5) · Stop button (needs streaming to cancel cleanly) · Copy card in B4 · typing while Jarvis works.
+
+### Risks and mitigations
+| Risk | Impact | Mitigation |
+|------|--------|------------|
+| QSS can't do soft glows/shadows like CSS | Low | The orb glow is painted by hand; the input pill shadow uses `QGraphicsDropShadowEffect` or is dropped |
+| Markdown in `QLabel` is basic (no syntax highlighting) | Low | Good enough for Gemma's answers; revisit if code answers look bad |
+| DWM caption color is Win11-only | Low | Wrapped in try/except, so it falls back to the default bar |
+| Long chats overflow the 4096-token context | Med | Shows as an error card (F4); history trimming is the deferred Task 5 |
+
+### Open questions
+- Manrope font: download and bundle it, or is Segoe UI fine?

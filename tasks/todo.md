@@ -27,5 +27,11 @@
 
 # Front end: Todo (basic window)
 
-- [ ] Task F1: Basic PySide6 window, end to end (`app.py`, `jarvis.ask`), checked by Kush
-- [ ] Replace with Kush's design (when it arrives)
+- [x] Task F1: Basic PySide6 window, end to end (`app.py`, `jarvis.ask`), checked by Kush
+- [x] Task F2: Quiet Glass chat, normal flow (B1 + Option B) · M · deps F1
+- [x] Task F3: Working state + tool rows (B2), `tools.on_call` hook · S · deps F2
+- [x] Task F4: Error state + Try again (B5), `ask` returns (text, ok) · S · deps F2
+- [x] Task F5: Dark native title bar · XS · deps F2
+
+## Checkpoint G
+- [x] Design port checked by Kush against the boards; pytest + jarvis.py still fine
