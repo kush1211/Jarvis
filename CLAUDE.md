@@ -7,7 +7,8 @@ A local AI assistant on Kush's Windows laptop: a plain-Python chat (PySide6 wind
 
 ## Status (2026-10-31)
 - Phase 1 (chat client) and Phase 2 (tool calling, `open_app`) are done and pushed.
-- Front end done: `app.py`, a PySide6 window in Kush's "Quiet Glass" design (states: first open, chat, working + tool rows, error + Try again). Kush doesn't study the front-end code; keep core changes readable.
+- Front end done: `app.py`, a PySide6 window in Kush's "Quiet Glass" design (states: first open, chat, working + tool rows, error + Try again).
+- Animations done (subtle): breathing/rippling orb, first-message orb transition, fade-in messages, typing dots, control hovers. Kush doesn't study the front-end code; keep core changes readable.
 - Deferred extras: streaming, history trimming, show-thinking, README (see todo.md). Kush wants tools and a basic front end first.
 - Next: Phase 3 (more system tools + confirmation for tools that change things). Not planned yet.
 

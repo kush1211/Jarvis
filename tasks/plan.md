@@ -280,3 +280,19 @@ Mic button, "say Jarvis" and board B3 (voice, Phase 6) · "Use the local model i
 
 ### Open questions
 - Manrope font: download and bundle it, or is Segoe UI fine?
+
+## Animations (2026-10-31)
+Kush picked every animation offered, at the **subtle** level. Only `app.py` changes.
+- One helper `animate(start, end, ms, on_value)` (a `QVariantAnimation`) for every fade, slide, colour change and hover. Looping motion uses a ~30 fps `QTimer` per small widget, stopped while hidden. Opacity effects are removed when each fade ends.
+- Timings: breathing 3.5 s · ripple 2.4 s · fade + slide 250 ms · colour 400 ms · orb shrink 450 ms · hover 150 ms, all ease-out.
+
+### Task A1: Living orb · S
+Breathing glow when idle, ripples while working, a 400 ms purple ↔ grey blend on error and recovery. Accept: all three visible; ~0 % CPU when minimised.
+### Task A2: First-message transition · M
+The heading and hint fade out, and the orb shrinks from the centre into the top orb. Accept: no jump or flash, lands exactly, survives a resize.
+### Task A3: Chat motion · M
+Messages fade and slide in, typing dots while working, tool rows pop in with a self-drawing tick, smooth scroll. Accept: dots → row → answer with no jumps.
+### Task A4: Controls · S
+Send hover/press/nudge, input focus glow, Try again hover. Accept: soft, and no hover while disabled.
+### Checkpoint H
+Kush checks all four against the live server; pytest (6) passes; `jarvis.py` unchanged; commit when Kush says so.

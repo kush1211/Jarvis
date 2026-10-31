@@ -35,3 +35,13 @@
 
 ## Checkpoint G
 - [x] Design port checked by Kush against the boards; pytest + jarvis.py still fine
+
+# Animations: Todo (subtle)
+
+- [x] Task A1: Living orb (breathing, ripples, grey fade) · S
+- [x] Task A2: First-message orb shrink transition · M · deps A1
+- [x] Task A3: Chat motion (fade/slide, typing dots, tool rows, smooth scroll) · M
+- [x] Task A4: Controls (send hover/press, input glow, Try again hover) · S
+
+## Checkpoint H
+- [x] Checked by Kush on the live server; pytest + jarvis.py still fine
